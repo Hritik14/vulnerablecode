@@ -18,15 +18,19 @@ jobs:
       - name: Restore cache
         uses: actions/cache@v2
         with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          path: .venv
+          key: ${{ runner.os }}-venv-${{ hashFiles('**/requirements.txt') }}
           restore-keys: |
-            ${{ runner.os }}-pip-
+            ${{ runner.os }}-venv-
 
       - name: Install dependencies
         run: |
           sudo apt install  python3-dev postgresql libpq-dev build-essential libxml2-dev libxslt1-dev postgresql ncat
           python -m pip install --upgrade pip 
+
+      - name: Initialize venv
+        run: python -m venv .venv && \
+          . .venv/bin/activate && \
           pip install -r requirements.txt
     
       - name: Setup database
@@ -40,11 +44,8 @@ jobs:
           --host=localhost --port=5432 vulnerablecode
 
       - name: Run tests
-        run: python -m pytest -v -m "not webtest"
+        run: . .venv/bin/activate && \
+          python -m pytest -v -m "not webtest"
         env:
-          # The hostname, username used to communicate with Postgresql
-          POSTGRES_HOST: localhost
-          VC_DB_USER: vulnerablecode
-          POSTGRES_PORT: 5432
           DJANGO_DEV: 1
           GH_TOKEN: 1 

@@ -30,7 +30,7 @@ jobs:
 
       - name: Initialize venv
         run: python -m venv .venv && \
-          . .venv/bin/activate && \
+          source .venv/bin/activate && \
           pip install -r requirements.txt
     
       - name: Setup database
@@ -44,7 +44,7 @@ jobs:
           --host=localhost --port=5432 vulnerablecode
 
       - name: Run tests
-        run: . .venv/bin/activate && \
+        run: source .venv/bin/activate && \
           python -m pytest -v -m "not webtest"
         env:
           DJANGO_DEV: 1

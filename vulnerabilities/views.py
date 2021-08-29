@@ -24,6 +24,7 @@ from urllib.parse import urlencode
 
 from django.core.paginator import Paginator
 from django.db.models import Count
+from django.db.models import Q
 from django.http import HttpResponse
 from django.shortcuts import render, redirect
 from django.urls import reverse
@@ -73,8 +74,8 @@ class PackageSearchView(View):
             models.Package.objects.all()
             .filter(name__icontains=package_name, type__icontains=package_type)
             .annotate(
-                vulnerability_count=Count("vulnerabilities"),
-                patched_vulnerability_count=Count("resolved_vulnerabilities"),
+                vulnerability_count=Count("vulnerabilities", filter=Q(vulnerabilities__packagerelatedvulnerability__fix=False)),
+                patched_vulnerability_count=Count("vulnerabilities",filter=Q(vulnerabilities__packagerelatedvulnerability__fix=True)),
             )
             .prefetch_related()
         )
@@ -101,8 +102,8 @@ class VulnerabilitySearchView(View):
         vuln_id = request.GET["vuln_id"]
         return list(
             models.Vulnerability.objects.filter(vulnerability_id__icontains=vuln_id).annotate(
-                vulnerable_package_count=Count("vulnerable_packages"),
-                patched_package_count=Count("patched_packages"),
+                vulnerable_package_count=Count("packages", filter=Q(packagerelatedvulnerability__fix=False)),
+                patched_package_count=Count("packages", filter=Q(packagerelatedvulnerability__fix=True)),
             )
         )
 

@@ -124,7 +124,7 @@ def requests_with_5xx_retry(max_retries=5, backoff_factor=0.5):
 
 def nearest_patched_package(
     vulnerable_packages: List[PackageURL], resolved_packages: List[PackageURL]
-) -> List[AffectedPackage]:
+) -> List[Tuple]:
     class PackageURLWithVersionComparator:
         """
         This class is used to  get around bisect module's lack of supplying custom
@@ -158,11 +158,12 @@ def nearest_patched_package(
         if patched_package_index < resolved_package_count:
             patched_package = resolved_packages[patched_package_index].package
 
-        affected_package_with_patched_package_objects.append(
-            AffectedPackage(
-                vulnerable_package=vulnerable_package.package, patched_package=patched_package
-            )
-        )
+#        affected_package_with_patched_package_objects.append(
+#            AffectedPackage(
+#                vulnerable_package=vulnerable_package.package, patched_package=patched_package
+#            )
+#        )
+        affected_package_with_patched_package_objects.append((vulnerable_package.package, patched_package))
 
     return affected_package_with_patched_package_objects
 

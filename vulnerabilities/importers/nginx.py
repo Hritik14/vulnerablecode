@@ -36,10 +36,12 @@ from vulnerabilities.data_source import AffectedPackage
 from vulnerabilities.data_source import DataSource
 from vulnerabilities.data_source import DataSourceConfiguration
 from vulnerabilities.data_source import Reference
+from vulnerabilities.data_inference import Inference
+from vulnerabilities.data_inference import Improver
 from vulnerabilities.package_managers import GitHubTagsAPI
 from vulnerabilities.package_managers import Version
 from vulnerabilities.helpers import nearest_patched_package
-
+from vulnerabilities.models import Advisory
 
 @dataclasses.dataclass
 class NginxDataSourceConfiguration(DataSourceConfiguration):
@@ -50,21 +52,6 @@ class NginxDataSource(DataSource):
     CONFIG_CLASS = NginxDataSourceConfiguration
 
     url = "http://nginx.org/en/security_advisories.html"
-
-    def set_api(self):
-        self.version_api = GitHubTagsAPI()
-        asyncio.run(self.version_api.load_api(["nginx/nginx"]))
-
-        # For some reason nginx tags it's releases are in the form of `release-1.2.3`
-        # Chop off the `release-` part here.
-        normalized_versions = set()
-        while self.version_api.cache["nginx/nginx"]:
-            version = self.version_api.cache["nginx/nginx"].pop()
-            normalized_version = Version(
-                version.value.replace("release-", ""), version.release_date
-            )
-            normalized_versions.add(normalized_version)
-        self.version_api.cache["nginx/nginx"] = normalized_versions
 
     def advisory_data(self) -> List[AdvisoryData]:
         adv_data = []
@@ -170,7 +157,9 @@ class NginxDataSource(DataSource):
             if "-" not in version_info:
                 # These are discrete versions
                 version_ranges.append(
-                    VersionSpecifier.from_scheme_version_spec_string("semver", version_info[0])
+                    VersionSpecifier.from_scheme_version_spec_string(
+                        "semver", version_info[0]
+                    )
                 )
                 continue
 
@@ -193,6 +182,67 @@ class NginxDataSource(DataSource):
             AffectedPackage(package=purl, version_specifier=version_range)
             for version_range in version_ranges
         ]
+
+
+class NginxTimeTravel(Improver):
+    def infer(self):
+        self.set_api()
+        advisories = Advisory.objects.filter(
+            source="vulnerabilities.importers.nginx.NginxDataSource"
+        )
+        inferences = []
+        for advisory in advisories:
+            advisory_data = AdvisoryData.from_json(advisory.data)
+
+            affected_package_ranges = [
+                pkg.version_specifier for pkg in advisory_data.affected_packages
+            ]
+            affected_package_versions = find_valid_versions(
+                self.version_api.get("nginx/nginx").valid_versions,
+                affected_package_ranges,
+            )
+            affected_packages = []
+            for pkg in advisory_data.affected_packages:
+                for 
+                affected_packages.extend([])
+            affected_packages = [advisory_data.affected_packages]
+
+            fixed_package_ranges = [
+                pkg.version_specifier for pkg in advisory_data.affected_packages
+            ]
+            fixed_packages = find_valid_versions(
+                self.version_api.get("nginx/nginx").valid_versions, fixed_package_ranges
+            )
+
+            pkgs = nearest_patched_package(affected_package_versions, fixed_package_ranges)
+            for pkg in pkgs:
+                print(pkg)
+                print(type(pkg))
+                inferences.append(
+                    Inference(
+                        confidence=90,  # TODO: Decide properly
+                        vulnerability_id=advisory_data.vulnerability_id,
+                        affected_packages=pkg[0],
+                        fixed_packages=pkg[1],
+                    )
+                )
+
+            return inferences
+
+    def set_api(self):
+        self.version_api = GitHubTagsAPI()
+        asyncio.run(self.version_api.load_api(["nginx/nginx"]))
+
+        # For some reason nginx tags it's releases are in the form of `release-1.2.3`
+        # Chop off the `release-` part here.
+        normalized_versions = set()
+        while self.version_api.cache["nginx/nginx"]:
+            version = self.version_api.cache["nginx/nginx"].pop()
+            normalized_version = Version(
+                version.value.replace("release-", ""), version.release_date
+            )
+            normalized_versions.add(normalized_version)
+        self.version_api.cache["nginx/nginx"] = normalized_versions
 
 
 def find_valid_versions(versions, version_ranges):
